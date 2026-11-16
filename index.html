@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hydrogen — WebGL2 Pure Sphere-Traced Water & Glass SDF</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="gl-canvas"></canvas>
+
+  <!-- Minimal top-left HUD -->
+  <header class="hud-badge">
+    <div class="hud-title-row">
+      <span class="hud-dot"></span>
+      <h1>HYDROGEN <span class="hud-tag">SDF</span></h1>
+    </div>
+    <p id="gpu-telemetry" class="hud-telemetry">Initializing WebGL2 float pipeline…</p>
+    <p class="hud-hint">Drag to orbit • Scroll to zoom • Double-click to reset</p>
+  </header>
+
+  <!-- Toggle panel button -->
+  <button id="toggle-panel-btn" class="panel-toggle" title="Toggle Controls" aria-label="Toggle Controls">
+    <span class="toggle-icon">⚙</span>
+    <span class="toggle-label">Controls</span>
+  </button>
+
+  <!-- Control Panel -->
+  <aside id="control-panel" class="control-panel">
+    <div class="panel-header">
+      <div>
+        <h2>Optical Studio</h2>
+        <span class="panel-subtitle">Pure Sphere-Tracing • 32F/16F Pipeline</span>
+      </div>
+      <button id="reset-camera-btn" class="btn-ghost" title="Reset Camera">Reset View</button>
+    </div>
+
+    <div class="panel-scroll">
+      <!-- Material Presets -->
+      <section class="control-section">
+        <div class="section-title">Material Presets</div>
+        <div id="preset-grid" class="preset-grid"></div>
+      </section>
+
+      <!-- Optical Properties -->
+      <section class="control-section">
+        <div class="section-title">Optical Properties</div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Index of Refraction (IOR)</span>
+            <output id="val-ior">1.333</output>
+          </div>
+          <input id="ctrl-ior" type="range" min="1.05" max="2.50" step="0.001" value="1.333" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Chromatic Dispersion</span>
+            <output id="val-dispersion">0.035</output>
+          </div>
+          <input id="ctrl-dispersion" type="range" min="0.0" max="0.14" step="0.001" value="0.035" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Beer-Lambert Absorption</span>
+            <output id="val-absorption">0.55</output>
+          </div>
+          <input id="ctrl-absorption" type="range" min="0.0" max="3.0" step="0.01" value="0.55" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Fresnel Specular Boost</span>
+            <output id="val-fresnel">1.15</output>
+          </div>
+          <input id="ctrl-fresnel" type="range" min="0.4" max="2.5" step="0.01" value="1.15" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Core Etch Luminance</span>
+            <output id="val-etchGlow">1.10</output>
+          </div>
+          <input id="ctrl-etchGlow" type="range" min="0.0" max="2.5" step="0.01" value="1.10" />
+        </div>
+
+        <div class="control-row inline-color">
+          <label for="ctrl-tint">Medium Tint</label>
+          <div class="color-wrap">
+            <span id="val-tint" class="color-hex">#6be8ff</span>
+            <input id="ctrl-tint" type="color" value="#6be8ff" />
+          </div>
+        </div>
+      </section>
+
+      <!-- Frost & Surface -->
+      <section class="control-section">
+        <div class="section-title">Frost &amp; Micro-Surface</div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Surface Frost</span>
+            <output id="val-frost">0.04</output>
+          </div>
+          <input id="ctrl-frost" type="range" min="0.0" max="1.0" step="0.005" value="0.04" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Frost Grain Scale</span>
+            <output id="val-frostScale">14.0</output>
+          </div>
+          <input id="ctrl-frostScale" type="range" min="2.0" max="42.0" step="0.5" value="14.0" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Frost Scatter / Bloom</span>
+            <output id="val-bloom">0.48</output>
+          </div>
+          <input id="ctrl-bloom" type="range" min="0.0" max="1.5" step="0.01" value="0.48" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Core Etch Frost</span>
+            <output id="val-etchFrost">0.38</output>
+          </div>
+          <input id="ctrl-etchFrost" type="range" min="0.0" max="1.0" step="0.01" value="0.38" />
+        </div>
+      </section>
+
+      <!-- Key Light Controls -->
+      <section class="control-section">
+        <div class="section-title">Key Light &amp; Studio</div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Key Azimuth</span>
+            <output id="val-lightAzimuth">38°</output>
+          </div>
+          <input id="ctrl-lightAzimuth" type="range" min="-180" max="180" step="1" value="38" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Key Elevation</span>
+            <output id="val-lightElevation">52°</output>
+          </div>
+          <input id="ctrl-lightElevation" type="range" min="6" max="88" step="1" value="52" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Key Intensity</span>
+            <output id="val-lightIntensity">2.80</output>
+          </div>
+          <input id="ctrl-lightIntensity" type="range" min="0.2" max="6.0" step="0.05" value="2.80" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>HDR Exposure</span>
+            <output id="val-exposure">1.15</output>
+          </div>
+          <input id="ctrl-exposure" type="range" min="0.4" max="2.5" step="0.01" value="1.15" />
+        </div>
+
+        <div class="control-row inline-color">
+          <label for="ctrl-lightColor">Key Light Color</label>
+          <div class="color-wrap">
+            <span id="val-lightColor" class="color-hex">#fff4e6</span>
+            <input id="ctrl-lightColor" type="color" value="#fff4e6" />
+          </div>
+        </div>
+
+        <div class="control-row inline-select">
+          <label for="ctrl-envTheme">Studio Backdrop</label>
+          <select id="ctrl-envTheme">
+            <option value="0">Obsidian Studio</option>
+            <option value="1">Abyssal Deep</option>
+            <option value="2">Arctic Daylight</option>
+            <option value="3">Amber Horizon</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Additional Volume Settings -->
+      <section class="control-section">
+        <div class="section-title">Volume &amp; Core Settings</div>
+
+        <div class="control-row inline-select">
+          <label for="ctrl-shape">Volume Shape</label>
+          <select id="ctrl-shape">
+            <option value="0">Rounded Prism</option>
+            <option value="1">Water Cushion</option>
+            <option value="2">Faceted Monolith</option>
+            <option value="3">Capsule Lens</option>
+          </select>
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Surface Ripple Amp</span>
+            <output id="val-rippleAmp">0.022</output>
+          </div>
+          <input id="ctrl-rippleAmp" type="range" min="0.0" max="0.09" step="0.001" value="0.022" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Ripple Speed</span>
+            <output id="val-rippleSpeed">1.00</output>
+          </div>
+          <input id="ctrl-rippleSpeed" type="range" min="0.0" max="3.0" step="0.05" value="1.00" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Etch Scale</span>
+            <output id="val-etchScale">1.00</output>
+          </div>
+          <input id="ctrl-etchScale" type="range" min="0.55" max="1.35" step="0.01" value="1.00" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Etch Core Depth</span>
+            <output id="val-etchDepth">0.11</output>
+          </div>
+          <input id="ctrl-etchDepth" type="range" min="0.03" max="0.24" step="0.005" value="0.11" />
+        </div>
+
+        <div class="control-row">
+          <div class="control-label">
+            <span>Caustic Strength</span>
+            <output id="val-caustics">1.15</output>
+          </div>
+          <input id="ctrl-caustics" type="range" min="0.0" max="2.5" step="0.05" value="1.15" />
+        </div>
+
+        <div class="control-row inline-toggle">
+          <label for="ctrl-autoRotate">Auto-Orbit Camera</label>
+          <label class="switch">
+            <input id="ctrl-autoRotate" type="checkbox" checked />
+            <span class="slider-round"></span>
+          </label>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
